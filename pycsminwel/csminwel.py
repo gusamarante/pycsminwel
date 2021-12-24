@@ -36,6 +36,7 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=None, nit=None, verbose=True):
         print('f at the beginning of new iteration is', f)  # TODO if verbose
         iter_count += 1
         f1, x1, fc, retcode1 = csminit(fcn, x, f, g, badg, h)
+        a = 1
 
         # TODO parei aqui - linha 73 do MATLAB csminwel
 
@@ -51,6 +52,7 @@ def csminit(fcn, x0, f0, g0, badg, h0):
     minlamb = 1e-9
     mindfac = 0.01
 
+    retcode = None
     fcount = 0
     lambda_ = 1
     xhat = x0
@@ -85,7 +87,7 @@ def csminit(fcn, x0, f0, g0, badg, h0):
 
         done = False
         factor = 3
-        shrink = 1
+        shrink = True
         lambdaMax = np.inf
         lambdaPeak = 0
         fPeak = f0
@@ -109,7 +111,71 @@ def csminit(fcn, x0, f0, g0, badg, h0):
             shrinkSignal = ((not badg) and (f0 - f < max(- theta * dfhat * lambda_, 0))) or (badg and (f0 - f < 0))
             growSignal = (not badg) and ((lambda_ > 0) and (f0 - f > - (1 - theta) * dfhat * lambda_))
 
-            # TODO parei aqui - linha 123 do MATLAB csminit
+            if shrinkSignal and ((lambda_ > lambdaPeak) or (lambda_ < 0)):
+                if lambda_ > 0 and ((not badg) or (lambda_ / factor <= lambdaPeak)):
+                    shrink = True
+                    factor = factor ** 0.6
+
+                    while lambda_/factor <= lambdaPeak:
+                        factor = factor ** 0.6
+
+                    if np.abs(factor - 1) < mindfac:
+
+                        if np.abs(lambda_) < 4:
+                            retcode = 2
+                        else:
+                            retcode = 7
+
+                        done = True
+
+                if (lambda_ < lambdaMax) and (lambda_ > lambdaPeak):
+                    lambdaMax = lambda_
+
+                lambda_ = lambda_ / factor
+
+                if np.abs(lambda_) < minlamb:
+                    if (lambda_ > 0) and (f0 <= fhat):
+                        # try going against gradient, which may be inaccurate
+                        lambda_ = - lambda_ * factor ** 6
+                    else:
+                        if lambda_ < 0:
+                            retcode = 6
+                        else:
+                            retcode = 3
+
+                        done = True
+
+            elif (growSignal and lambda_ > 0) or (shrinkSignal and ((lambda_ <= lambdaPeak) and (lambda_ > 0))):
+                if shrink:
+                    shrink = False
+                    factor = factor ** 0.6
+
+                    if np.abs(factor - 1) < mindfac:
+                        if np.abs(lambda_) < 4:
+                            retcode = 4
+                        else:
+                            retcode = 7
+
+                        done = True
+
+                if (f < fPeak) and (lambda_ > 0):
+                    fPeak = f
+                    lambdaPeak = lambda_
+                    if lambdaMax <= lambdaPeak:
+                        lambdaMax = lambdaPeak * (factor ** 2)
+
+                lambda_ = lambda_ * factor
+
+                if np.abs(lambda_) > 1e20:
+                    retcode = 5
+                    done = True
+
+            else:
+                done = True
+                if factor < 1.2:
+                    retcode = 7
+                else:
+                    retcode = 0
 
     return fhat, xhat, fcount, retcode
 
