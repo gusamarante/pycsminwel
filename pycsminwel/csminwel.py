@@ -15,6 +15,8 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
 
     # TODO fix variables referenced before assignment
 
+    # TODO Write README.md
+
     # TODO possible renameming of variables
 
     # TODO Documentation (minimization. Uses a quasi-Newton method with BFGS
