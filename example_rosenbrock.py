@@ -20,6 +20,7 @@ def drosenbrock(x):
     """
     dr = np.zeros(2)
     dr[0] = 2 * (x[0] - 1) - 8 * 105 * x[0] * (x[1] - x[0] ** 2) ** 3
+    dr[1] = 4 * 105 * (x[1] - x[0] ** 2) ** 3
     return dr
 
 
