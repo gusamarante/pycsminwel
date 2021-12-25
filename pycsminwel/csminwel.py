@@ -1,8 +1,19 @@
+"""
+All of the functions in this file were created by Christopher Sims in 1996.
+They are translations to python from the author's original MATLAB files.
+
+The originals can be found in:
+http://sims.princeton.edu/yftp/optimize/
+"""
+
 import numpy as np
+from warnings import warn
 
 
-def csminwel(fcn, x0, h0=None, grad=None, crit=None, nit=None, verbose=True):
-    # TODO verbose False
+def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
+    # TODO add a pythonic object for the return, with relevant attributes
+
+    # TODO fix variables referenced before assignment
 
     # TODO possible renameming of variables
 
@@ -12,10 +23,10 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=None, nit=None, verbose=True):
     #  hyperplane discontinuities, though it is not really clear whether what it does in
     #  such cases succeeds reliably.)
 
-    # TODO assert types. x0 has ndim=1. fcn and grad ar functions
+    # TODO assert types. x0 has ndim=1. fcn and grad as functions
 
     nx = x0.shape[0]
-    iter_count = 0
+    itct = 0
     fcount = 0
     numGrad = True if grad is None else False
 
@@ -33,14 +44,193 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=None, nit=None, verbose=True):
     done = False
 
     while not done:
-        print('f at the beginning of new iteration is', f)  # TODO if verbose
-        iter_count += 1
+        itct += 1
+
+        if verbose:
+            print(f'f at the beginning of iteration {itct} is', f)
+
         f1, x1, fc, retcode1 = csminit(fcn, x, f, g, badg, h)
-        a = 1
 
-        # TODO parei aqui - linha 73 do MATLAB csminwel
+        fcount += fc
 
-    return g
+        if retcode1 != 1:
+            if retcode1 == 2 or retcode1 == 4:
+                wall1 = True
+                badg1 = True
+            else:
+                if numGrad:
+                    g1, badg1 = numgrad(fcn, x1)
+                else:
+                    g1 = grad(x1)
+                    badg1 = False
+
+                wall1 = badg1
+
+            if wall1 and h.shape[0] > 1:
+                # Bad gradient or back and forth on step length. Possibly at cliff edge.
+                # Try perturbing search direction if problem not 1D
+                hCliff = h + np.diag(np.diag(h) * np.random.rand(nx))
+                f2, x2, fc, retcode2 = csminit(fcn, x, f, g, badg, hCliff)
+                fcount += fc
+
+                if f2 < f:
+                    if retcode2 == 2 or retcode2 == 4:
+                        wall2 = True
+                        badg2 = True
+                    else:
+                        if numGrad:
+                            g2, badg2 = numgrad(fcn, x2)
+                        else:
+                            g2 = grad(x2)
+                            badg2 = False
+
+                        wall2 = badg2
+
+                    if wall2:
+                        # cliff again. Try traversing.
+                        if np.linalg.norm(x2 - x1) < 1e-13:
+                            f3 = f
+                            x3 = x
+                            badg3 = True
+                            retcode3 = 101
+                        else:
+                            gcliff = ((f2 - f1) / ((np.linalg.norm(x2 - x1)) ** 2)) * (x2 - x1)
+                            # TODO "if (size(x0, 2) > 1), gcliff=gcliff', end"   <-- this is matlab code, only
+                            #  needed if x is a matrix. Not our case.
+                            f3, x3, fc, retcode3 = csminit(fcn, x, f, gcliff, False, np.eye(nx))
+                            fcount += fc
+
+                            if retcode3 == 2 or retcode3 == 4:
+                                wall3 = True
+                                badg3 = True
+                            else:
+                                if numGrad:
+                                    g3, badg3 = numgrad(fcn, x3)
+                                else:
+                                    g3 = grad(x3)
+                                    badg3 = False
+
+                                wall3 = badg3
+
+                    else:
+                        f3 = f
+                        x3 = x
+                        badg3 = True
+                        retcode3 = 101
+
+                else:
+                    f3 = f
+                    x3 = x
+                    badg3 = True
+                    retcode3 = 101
+
+            else:
+                # normal iteration, no walls, or else 1D, or else we're finished here
+                f2 = f
+                f3 = f
+                badg2 = True
+                badg3 = True
+                retcode2 = 101
+                retcode3 = 101
+
+        else:
+            f2 = f
+            f3 = f
+            f1 = f
+            retcode2 = retcode1
+            retcode3 = retcode1
+
+        if (f3 < f - crit) and (badg3 is False):
+            ih = 3
+            fh = f3
+            xh = x3
+            gh = g3
+            badgh = badg3
+            retcodeh = retcode3
+
+        elif (f2 < f - crit) and (badg2 is False):
+            ih = 2
+            fh = f2
+            xh = x2
+            gh = g2
+            badgh = badg2
+            retcodeh = retcode2
+
+        elif (f1 < f - crit) and (badg1 is False):
+            ih = 1
+            fh = f1
+            xh = x1
+            gh = g1
+            badgh = badg1
+            retcodeh = retcode1
+        else:
+            fh = min(f1, f2, f3)
+            ih = np.argmin([f1, f2, f3])
+
+            if ih == 0:
+                xh = x1
+            elif ih == 1:
+                xh = x2
+            elif ih == 2:
+                xh = x3
+
+            retcodei = [retcode1, retcode2, retcode3]
+            retcodeh = retcodei[ih]
+
+            if 'gh' in locals():
+                nogh = gh.size == 0
+            else:
+                nogh = True
+
+            if nogh:
+                if numGrad:
+                    gh, badgh = numgrad(fcn, xh)
+                else:
+                    gh = grad(xh)
+                    badgh = False
+
+            badgh = True
+
+        stuck = (np.abs(fh - f) < crit)
+
+        if (not badg) and (not badgh) and (not stuck):
+            h = bfgsi(h, gh - g, xh - x)
+
+        if verbose:
+            print(f'Improvement on iteration {itct} was {f - fh}')
+
+        if itct > nit:
+            if verbose:
+                print('Maximum number of iterations reached')
+            done = True
+
+        elif stuck:
+            if verbose:
+                print("Convergence achieved. Improvement lower than 'crit'.")
+            done = True
+
+        if verbose:
+            if retcodeh == 1:
+                print('Zero gradient')
+            elif retcodeh == 6:
+                print('Smallest step still improving too slow, reversed gradient')
+            elif retcodeh == 5:
+                print('Largest step still improving too fast')
+            elif retcodeh == 4 or retcodeh == 2:
+                print('Back and forth on step length never finished')
+            elif retcodeh == 3:
+                print('Smallest step still improving too slow')
+            elif retcodeh == 7:
+                warn('Possible inaccuracy in the Hessian matrix')
+
+            print('\n')
+
+        f = fh
+        x = xh
+        g = gh
+        badg = badgh
+
+    return fh, xh, gh, h, itct, fcount, retcodeh
 
 
 def csminit(fcn, x0, f0, g0, badg, h0):
@@ -112,7 +302,7 @@ def csminit(fcn, x0, f0, g0, badg, h0):
             growSignal = (not badg) and ((lambda_ > 0) and (f0 - f > - (1 - theta) * dfhat * lambda_))
 
             if shrinkSignal and ((lambda_ > lambdaPeak) or (lambda_ < 0)):
-                if lambda_ > 0 and ((not badg) or (lambda_ / factor <= lambdaPeak)):
+                if lambda_ > 0 and ((not shrink) or (lambda_ / factor <= lambdaPeak)):
                     shrink = True
                     factor = factor ** 0.6
 
@@ -128,7 +318,7 @@ def csminit(fcn, x0, f0, g0, badg, h0):
 
                         done = True
 
-                if (lambda_ < lambdaMax) and (lambda_ > lambdaPeak):
+                if (lambda_ < lambdaMax) and (lambda_ > lambdaPeak):  # TODO linha 140
                     lambdaMax = lambda_
 
                 lambda_ = lambda_ / factor
@@ -208,3 +398,38 @@ def numgrad(fcn, x):
             bad_gradient = True
 
     return g, bad_gradient
+
+
+def bfgsi(h0, dg, dx, verbose=False):
+    # TODO Verbose
+
+    # TODO Documentation BFGS update for the inverse hessian, dg is previous change in gradient; dx is previous change in x
+
+    # TODO the code below is only needed if the input x is a matrix (in matlab)
+    # if size(dg, 2) > 1
+    #     dg = dg
+    #     ';
+    # end
+    # if size(dx, 2) > 1
+    #     dx = dx
+    #     ';
+    # end
+
+    dx = dx.reshape(-1, 1)
+    dg = dg.reshape(-1, 1)
+
+    hdg = h0 @ dg
+    dgdx = (dg.T @ dx)[0, 0]
+
+    if np.abs(dgdx) > 1e-12:
+        h = h0 + (1 + (dg.T @ hdg) / dgdx) * (dx @ dx.T) / dgdx - (dx @ hdg.T + hdg @ dx.T) / dgdx
+
+    else:
+        # TODO Verbose
+        # disp('bfgs update failed.')
+        # disp(['|dg| = ' num2str(sqrt(dg'*dg)) ' | dx | = ' num2str(sqrt(dx' * dx))]);
+        # disp(['dg''*dx = ' num2str(dgdx)])
+        # disp(['|H*dg| = ' num2str(Hdg'*Hdg)])
+        h = h0
+
+    return h
