@@ -263,7 +263,7 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
 
 def csminit(fcn, x0, f0, g0, badg, h0):
 
-    # Do not ask where these come from
+    # Do not ask me where these come from
     angle = 0.005
     theta = 0.3
     fchange = 1000
@@ -429,9 +429,16 @@ def numgrad(fcn, x):
 
 
 def bfgsi(h0, dg, dx, verbose=False):
-    # TODO Verbose
+    """
+    BFGS update for the inverse hessian, ;
+    :param h0: previous value of the inverse hessian
+    :param dg: dg is previous change in gradient
+    :param dx: dx is previous change in x
+    :param verbose: If True, prints updates of the algorithm
+    :return: updated inverse hessian matrix
+    """
 
-    # TODO Documentation BFGS update for the inverse hessian, dg is previous change in gradient; dx is previous change in x
+    # TODO Verbose
 
     # TODO the code below is only needed if the input x is a matrix (in matlab)
     # if size(dg, 2) > 1
