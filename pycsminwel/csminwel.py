@@ -4,6 +4,11 @@ They are translations to python from the author's original MATLAB files.
 
 The originals can be found in:
 http://sims.princeton.edu/yftp/optimize/
+
+I kept the author's original variable names so it is easier to compare
+this code with his. Also, this code is not very pythonic, it is very
+matlaby. I need a better understanding of the algorithm before making
+it more pythonic.
 """
 
 import numpy as np
@@ -11,26 +16,47 @@ from warnings import warn
 
 
 def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
-    # TODO add a pythonic object for the return, with relevant attributes
+    """
+    This is a locol minimization algorithm. Uses a quasi-Newton method with BFGS
+    update of the estimated inverse hessian. It is robust against certain
+    pathologies common on likelihood functions. It attempts to be robust against
+    "cliffs", i.e. hyperplane discontinuities, though it is not really clear
+    whether what it does in such cases succeeds reliably.
+
+    The author of this algorithm is Christopher Sims.
+
+    :param fcn: The function to be minimized. Must have only one input.
+    :param x0: Initial guess for the optimization.
+    :param h0: Initial guess for the inverse hessian matrix. Must be a positive
+               definite matrix.
+    :param grad: A function that calculates the gradient of 'fcn'. The function
+                 must output a single array with the same dimension as x.
+                 If None, the optimization calculates a numerical gradient.
+    :param crit: Convergence criterion. Iteration will cease when it proves
+                 impossible to improve 'fcn' value by more than 'crit'.
+    :param nit: Maximum number of iterations.
+    :param verbose: If True, prints the steps of the algorithm.
+    :return: fh: minimal value of the function
+             xh: optimal input
+             gh: gradient at the optimal value
+             h: inverse hessian matrix at the optimal value
+             itct: number of iterations
+             fcount: number of times 'fcn' was evaluated
+             retcodeh: return code.
+    """
 
     # TODO fix variables referenced before assignment
-
-    # TODO Write README.md
-
-    # TODO possible renameming of variables
-
-    # TODO Documentation (minimization. Uses a quasi-Newton method with BFGS
-    #  update of the estimated inverse hessian. It is robust against certain pathologies
-    #  common on likelihood functions. It attempts to be robust against "cliffs", i.e.
-    #  hyperplane discontinuities, though it is not really clear whether what it does in
-    #  such cases succeeds reliably.)
-
     # TODO assert types. x0 has ndim=1. fcn and grad as functions
+    # TODO assert 'grad' return a nx-D numpy array of ndim = 1
+    # TODO assert h0 is positive definite
 
     nx = x0.shape[0]
     itct = 0
     fcount = 0
     numGrad = True if grad is None else False
+
+    if h0 is None:  # This is not a desired behaviour. Passing h0 is recommended.
+        h0 = 0.5 * np.eye(nx)
 
     f0 = fcn(x0)
 
