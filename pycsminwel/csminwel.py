@@ -45,12 +45,18 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
              retcodeh: return code.
     """
 
-    # TODO fix variables referenced before assignment
-    # TODO assert types. x0 has ndim=1. fcn and grad as functions
-    # TODO assert 'grad' return a nx-D numpy array of ndim = 1
-    # TODO assert h0 is positive definite
+    assert isinstance(x0, np.ndarray) and x0.ndim == 1, "'x0' must be a numpy.ndarray with only 1 dimension"
+    assert callable(fcn), "'fcn' must be a callable function"
+    assert np.all(np.linalg.eigvals(h0) > 0), "'h0' must be positive definite"
 
     nx = x0.shape[0]
+
+    if grad is not None:
+        assert callable(grad), "'grad' must be a callable function"
+        test_grad = grad(x0)
+        assert test_grad.shape[0] == nx, "output of 'grad' does not match the size of 'x'"
+        assert test_grad.ndim == 1, "output of 'grad' must have ndim equal to 1"
+
     itct = 0
     fcount = 0
     numGrad = True if grad is None else False
@@ -66,6 +72,21 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
         g = grad(x0)
         badg = False
 
+    # To avoid declaration before assignment
+    badg1 = None
+    badg2 = None
+    badg3 = None
+    x2 = None
+    x3 = None
+    xh = None
+    fh = None
+    g1 = None
+    g2 = None
+    g3 = None
+    gh = None
+    retcodeh = None
+
+    # Start the optimization
     x = x0
     f = f0
     h = h0
@@ -222,7 +243,7 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
         stuck = (np.abs(fh - f) < crit)
 
         if (not badg) and (not badgh) and (not stuck):
-            h = bfgsi(h, gh - g, xh - x)
+            h = bfgsi(h, gh - g, xh - x, verbose=verbose)
 
         if verbose:
             print(f'Improvement on iteration {itct} was {f - fh}')
@@ -274,7 +295,6 @@ def csminit(fcn, x0, f0, g0, badg, h0):
     fcount = 0
     lambda_ = 1
     xhat = x0
-    f = f0
     fhat = f0
     g = g0
     gnorm = np.linalg.norm(g)
@@ -282,7 +302,6 @@ def csminit(fcn, x0, f0, g0, badg, h0):
     if gnorm < 1e-12 and not badg:
         # gradient convergence
         retcode = 1
-        dxnorm = 0
     else:
         # with badg true, we don't try to match rate of improvement to
         # directional derivative.  We're satisfied just to get *some*
@@ -309,7 +328,6 @@ def csminit(fcn, x0, f0, g0, badg, h0):
         lambdaMax = np.inf
         lambdaPeak = 0
         fPeak = f0
-        lambdaHat = 0
 
         while not done:
             if x0.shape[0] > 1:
@@ -322,7 +340,6 @@ def csminit(fcn, x0, f0, g0, badg, h0):
             if f < fhat:
                 fhat = f
                 xhat = dxtest
-                lambdaHat = lambda_
 
             fcount += 1
 
@@ -346,7 +363,7 @@ def csminit(fcn, x0, f0, g0, badg, h0):
 
                         done = True
 
-                if (lambda_ < lambdaMax) and (lambda_ > lambdaPeak):  # TODO linha 140
+                if (lambda_ < lambdaMax) and (lambda_ > lambdaPeak):
                     lambdaMax = lambda_
 
                 lambda_ = lambda_ / factor
@@ -438,8 +455,6 @@ def bfgsi(h0, dg, dx, verbose=False):
     :return: updated inverse hessian matrix
     """
 
-    # TODO Verbose
-
     # TODO the code below is only needed if the input x is a matrix (in matlab)
     # if size(dg, 2) > 1
     #     dg = dg
@@ -460,11 +475,12 @@ def bfgsi(h0, dg, dx, verbose=False):
         h = h0 + (1 + (dg.T @ hdg) / dgdx) * (dx @ dx.T) / dgdx - (dx @ hdg.T + hdg @ dx.T) / dgdx
 
     else:
-        # TODO Verbose
-        # disp('bfgs update failed.')
-        # disp(['|dg| = ' num2str(sqrt(dg'*dg)) ' | dx | = ' num2str(sqrt(dx' * dx))]);
-        # disp(['dg''*dx = ' num2str(dgdx)])
-        # disp(['|H*dg| = ' num2str(Hdg'*Hdg)])
+        if verbose:
+            print('bfgs update failed')
+            # disp(['|dg| = ' num2str(sqrt(dg'*dg)) ' | dx | = ' num2str(sqrt(dx' * dx))]);
+            # disp(['dg''*dx = ' num2str(dgdx)])
+            # disp(['|H*dg| = ' num2str(Hdg'*Hdg)])
+
         h = h0
 
     return h
