@@ -47,7 +47,6 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
 
     assert isinstance(x0, np.ndarray) and x0.ndim == 1, "'x0' must be a numpy.ndarray with only 1 dimension"
     assert callable(fcn), "'fcn' must be a callable function"
-    assert np.all(np.linalg.eigvals(h0) > 0), "'h0' must be positive definite"
 
     nx = x0.shape[0]
 
@@ -63,6 +62,8 @@ def csminwel(fcn, x0, h0=None, grad=None, crit=1e-14, nit=100, verbose=False):
 
     if h0 is None:  # This is not a desired behaviour. Passing h0 is recommended.
         h0 = 0.5 * np.eye(nx)
+    else:
+        assert np.all(np.linalg.eigvals(h0) > 0), "'h0' must be positive definite"
 
     f0 = fcn(x0)
 
